@@ -14,7 +14,6 @@
 #include "gsKit.h"
 #include "gsInline.h"
 
-#include <stdio.h>
 #include <kernel.h>
 
 u32 gsKit_vram_alloc(GSGLOBAL *gsGlobal, u32 size, u8 type)
@@ -75,7 +74,7 @@ void gsKit_setactive(GSGLOBAL *gsGlobal)
 	u64 *p_data;
 	u64 *p_store;
 
-	(u32)p_data = (u32)p_store = gsGlobal->dma_misc;
+	p_data = p_store = (u64 *)gsGlobal->dma_misc;
 
 	*p_data++ = GIF_TAG( 4, 1, 0, 0, 0, 1 );
 	*p_data++ = GIF_AD;

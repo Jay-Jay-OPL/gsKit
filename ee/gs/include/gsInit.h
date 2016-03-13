@@ -509,7 +509,7 @@
 		((u64)(GS_UV)		<< 36)	| \
 		((u64)(GS_XYZ2)		<< 40)	| \
 		((u64)(GIF_NOP)		<< 44);
-		
+
 // Textured Triangle Goraud Primitive
 /// Textured Triangle Goraud Primitive GIFTAG
 #define GIF_TAG_TRIANGLE_GORAUD_TEXTURED(NLOOP)   \
@@ -1048,7 +1048,7 @@ struct gsRegisters {
  u64 ID:          8 __attribute__((packed)); /* ro */
  u64 pad32:      32 __attribute__((packed));
 };
-typedef struct gsRegisters GSREG __attribute__((packed));
+typedef struct gsRegisters GSREG;
 
 #ifdef __cplusplus
 extern "C" {

@@ -58,7 +58,7 @@
 #define DMA_CHANNEL_GIF		0x2
 #define DMA_CHANNEL_FROMIPU	0x3
 #define DMA_CHANNEL_TOIPU	0x4
-#define DMA_CHANNEL_SIF0	0x5 
+#define DMA_CHANNEL_SIF0	0x5
 #define DMA_CHANNEL_SIF1	0x6
 #define DMA_CHANNEL_SIF2	0x7
 #define DMA_CHANNEL_FROMSPR	0x8
@@ -74,11 +74,11 @@ extern "C" {
 #endif
 
 /// DMAC Initilization
-int dmaKit_init(unsigned int RELE, unsigned int MFD, unsigned int STS, 
-                unsigned int STD, unsigned int RCYC, u16 fastwaitchannels);
+int dmaKit_init(u32 RELE, u32 MFD, u32 STS,
+                u32 STD, u32 RCYC, u16 fastwaitchannels);
 
 /// DMA Channel Initilization
-int dmaKit_chan_init(unsigned int channel);
+int dmaKit_chan_init(u32 channel);
 
 #ifdef __cplusplus
 }

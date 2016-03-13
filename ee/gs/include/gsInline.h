@@ -13,6 +13,8 @@
 #ifndef __GSINLINE_H__
 #define __GSINLINE_H__
 
+#include <stdio.h>
+
 ///  Drawbuffer Heap Allocator
 static inline void *gsKit_heap_alloc(GSGLOBAL *gsGlobal, int qsize, int bsize, int type)
 {
@@ -50,7 +52,7 @@ static inline void *gsKit_heap_alloc(GSGLOBAL *gsGlobal, int qsize, int bsize, i
 	gsGlobal->CurQueue->tag_size += qsize;
 	void *p_heap = gsGlobal->CurQueue->pool_cur;
 	gsGlobal->CurQueue->pool_cur += bsize;
-	
+
 	return p_heap;
 }
 
@@ -80,7 +82,7 @@ static inline void *gsKit_heap_alloc_dma(GSGLOBAL *gsGlobal, int qsize, int bsiz
 	gsGlobal->CurQueue->pool_cur += bsize;
 	gsGlobal->CurQueue->dma_tag = gsGlobal->CurQueue->pool_cur;
 	gsGlobal->CurQueue->pool_cur += 16;
-	
+
 	return p_heap;
 }
 

@@ -157,7 +157,7 @@ int gsKit_fontm_unpack(GSFONTM *gsFontM)
 	gsFontM->Header.offset_table = malloc(TableSize);
 
 	u8 *temp;
-	(u32)temp = ((u32)unpacked + gsFontM->Header.baseoffset + 17680);
+	temp = (u8 *)((u32)unpacked + gsFontM->Header.baseoffset + 17680);
 
 	int TexSize = (338 * gsFontM->Header.num_entries);
 
@@ -241,10 +241,10 @@ int gsKit_fontm_unpack(GSFONTM *gsFontM)
 	return 0;
 }
 
-void gsKit_fontm_unpack_raw(unsigned char *base, struct gsKit_fontm_unpack *oke)
+void gsKit_fontm_unpack_raw(u8 *base, struct gsKit_fontm_unpack *oke)
 {
-	unsigned int val, count, i;
-	unsigned char *p, *src;
+	u32 val, count, i;
+	u8 *p, *src;
 
 	for (i=0, p=base; p < base+oke->size; i--, oke->data <<= 1)
 	{
@@ -507,7 +507,7 @@ void gsKit_fontm_print_scaled(GSGLOBAL *gsGlobal, GSFONTM *gsFontM, float X, flo
                 gsKit_texture_send_inline(gsGlobal, (void *)aligned, gsFontM->Texture->Width, gsFontM->Texture->Height, gsFontM->Texture->Vram, GS_PSM_T4, gsFontM->Texture->TBW, GS_CLUT_NONE);
                 //gsKit_texture_send_inline(gsGlobal, (void *)aligned, gsFontM->Texture->Width, gsFontM->Texture->Height, gsFontM->Texture->Vram, GS_PSM_T4, gsFontM->Texture->TBW, GS_CLUT_NONE);
                 gsFontM->LastPage[gsFontM->VramIdx] = aligned;
-                gsFontM->VramIdx = (++gsFontM->VramIdx) % GS_FONTM_PAGE_COUNT;
+                gsFontM->VramIdx = (gsFontM->VramIdx + 1) % GS_FONTM_PAGE_COUNT;
             }
 
             gsKit_prim_sprite_texture(gsGlobal, gsFontM->Texture, posx[curline], posy, uoffset, voffset,
