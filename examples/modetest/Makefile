@@ -6,29 +6,25 @@
 # Licenced under Academic Free License version 2.0
 # Review gsKit README & LICENSE files for further details.
 #
-# ee/gs/src/Makefile - gsKit gs makefile.
+# examples/modetest/Makefile - Makefile for "modetest" example.
 #
 
-EE_OBJS = 	gsCore.o \
-		gsFontM.o \
-		gsHires.o \
-		gsInit.o \
-		gsMisc.o \
-		gsPrimitive.o \
-		gsTexManager.o \
-		gsTexture.o \
-		gsVU1.o
+EE_BIN  = modetest.elf
+EE_OBJS = modetest.o pad.o
+EE_LIBS_EXTRA = -lpad
 
-EE_CFLAGS += -Wno-unused -O2
+all: $(EE_BIN)
 
-all: $(EE_OBJS)
-	$(EE_AR) rcs $(LIBGSKIT) $(EE_OBJS)
+test: all
+	ps2client -h $(PS2_IP) -t 1 execee host:$(EE_BIN)
+
+reset: clean
+	ps2client -h $(PS2_IP) reset
 
 clean:
-	rm -f $(EE_OBJS)
+	rm -f $(EE_OBJS) $(EE_BIN)
 
 install: all
 
-include ../../../Makefile.pref
-include ../../../Makefile.global
-
+include ../../Makefile.pref
+include ../Makefile.global

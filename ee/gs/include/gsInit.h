@@ -93,6 +93,8 @@
 
 /// DTV 480 Progressive Scan (720x480)
 #define GS_MODE_DTV_480P  0x50
+/// DTV 576 Progressive Scan (720x576)
+#define GS_MODE_DTV_576P  0x53
 /// DTV 1080 Interlaced (1920x1080)
 #define GS_MODE_DTV_1080I 0x51
 /// DTV 720 Progressive Scan (1280x720)
@@ -702,6 +704,13 @@
         ((u64)(SLBG)	<< 7)	| \
         ((u64)(ALP)     << 8)
 
+/// Setting For Modes Related to Video Synchronization
+#define GS_SET_SMODE2(INT, FFMD, DPMS) \
+	*GS_SMODE2 = \
+	((u64)(INT)     << 0)   | \
+	((u64)(FFMD)    << 1)   | \
+	((u64)(DPMS)    << 2)
+
 /// GS PCRTC (Merge Circuit) Register Access Macro (Extended for EXTBUF External Digital In)
 #define GS_SET_PMODE_EXT(EN1,EN2,CRTMD,MMOD,AMOD,SLBG,ALP, NFLD, EXVWINS, EXVWINE, EVSYNCMD) \
         *GS_PMODE = \
@@ -985,8 +994,10 @@ struct gsGlobal
 	int Aspect;          ///< Framebuffer Aspect Ratio (GS_ASPECT_4_3/GS_ASPECT_16_9)
 	int OffsetX;         ///< X Window Offset
 	int OffsetY;         ///< Y Window Offset
-	int StartX;          ///< X Starting Coordinate (Used for Placement Correction)
-	int StartY;          ///< Y Starting Coordinate (Used for Placement Correction)
+	int StartX;          ///< X Starting Coordinate (Used for Placement Correction) Default value
+	int StartY;          ///< Y Starting Coordinate (Used for Placement Correction) Default value
+	int StartXOffset;    ///< X Starting Coordinate (Used for Placement Correction) Additional correction
+	int StartYOffset;    ///< Y Starting Coordinate (Used for Placement Correction) Additional correction
 	int MagH;            ///< X Magnification Value (MAGH = DW / Width - 1)
 	int MagV;            ///< Y Magnification Value (MAGV = DH / Height - 1)
 	int DW;              ///< Total Display Area Width (DW = Width * (MAGH + 1))
@@ -1054,10 +1065,14 @@ typedef struct gsRegisters GSREG;
 extern "C" {
 #endif
 
+/// Checks the console's capabilities based on the ROM version (returns default video format: GS_MODE_NTSC or GS_MODE_PAL)
+short int gsKit_check_rom(void);
 /// Detect signal (returns GS_MODE_NTSC or GS_MODE_PAL)
-short int gsKit_detect_signal();
+#define gsKit_detect_signal() gsKit_check_rom()
 /// Initialize Screen and GS Registers
 void gsKit_init_screen(GSGLOBAL *gsGlobal);
+/// Position the framebuffer onto the display
+void gsKit_set_display_offset(GSGLOBAL *gsGlobal, int x, int y);
 /// Initialize gsGlobal (With Specified Sizes (In Bytes) for the Persistent and Oneshot drawbuffers)
 //GSGLOBAL *gsKit_init_global_custom(u8 mode, int Os_AllocSize, int Per_AllocSize);
 GSGLOBAL *gsKit_init_global_custom(int Os_AllocSize, int Per_AllocSize);

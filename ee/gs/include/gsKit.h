@@ -24,5 +24,7 @@
 #include "gsPrimitive.h"
 #include "gsTexture.h"
 #include "gsFontM.h"
+#include "gsHires.h"
+#include "gsTexManager.h"
 
 #endif /* __GSKIT_H__ */

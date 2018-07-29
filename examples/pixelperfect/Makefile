@@ -6,29 +6,24 @@
 # Licenced under Academic Free License version 2.0
 # Review gsKit README & LICENSE files for further details.
 #
-# ee/gs/src/Makefile - gsKit gs makefile.
+# examples/pixelperfect/Makefile - Makefile for "pixelperfect" example.
 #
 
-EE_OBJS = 	gsCore.o \
-		gsFontM.o \
-		gsHires.o \
-		gsInit.o \
-		gsMisc.o \
-		gsPrimitive.o \
-		gsTexManager.o \
-		gsTexture.o \
-		gsVU1.o
+EE_BIN  = pixelperfect.elf
+EE_OBJS = pixelperfect.o
 
-EE_CFLAGS += -Wno-unused -O2
+all: $(EE_BIN)
 
-all: $(EE_OBJS)
-	$(EE_AR) rcs $(LIBGSKIT) $(EE_OBJS)
+test: all
+	ps2client -h $(PS2_IP) -t 1 execee host:$(EE_BIN)
+
+reset: clean
+	ps2client -h $(PS2_IP) reset
 
 clean:
-	rm -f $(EE_OBJS)
+	rm -f $(EE_OBJS) $(EE_BIN)
 
 install: all
 
-include ../../../Makefile.pref
-include ../../../Makefile.global
-
+include ../../Makefile.pref
+include ../Makefile.global

@@ -6,29 +6,25 @@
 # Licenced under Academic Free License version 2.0
 # Review gsKit README & LICENSE files for further details.
 #
-# ee/gs/src/Makefile - gsKit gs makefile.
+# examples/hires/Makefile - Makefile for "hires" example.
 #
 
-EE_OBJS = 	gsCore.o \
-		gsFontM.o \
-		gsHires.o \
-		gsInit.o \
-		gsMisc.o \
-		gsPrimitive.o \
-		gsTexManager.o \
-		gsTexture.o \
-		gsVU1.o
+EE_BIN  = hires.elf
+EE_OBJS = main.o
+EE_LIBS_EXTRA = -ldraw -lgraph -lmath3d -lmf -lpacket -ldma
 
-EE_CFLAGS += -Wno-unused -O2
+all: $(EE_BIN)
 
-all: $(EE_OBJS)
-	$(EE_AR) rcs $(LIBGSKIT) $(EE_OBJS)
+test: all
+	ps2client -h $(PS2_IP) -t 1 execee host:$(EE_BIN)
+
+reset: clean
+	ps2client -h $(PS2_IP) reset
 
 clean:
-	rm -f $(EE_OBJS)
+	rm -f $(EE_OBJS) $(EE_BIN)
 
 install: all
 
-include ../../../Makefile.pref
-include ../../../Makefile.global
-
+include ../../Makefile.pref
+include ../Makefile.global

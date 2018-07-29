@@ -47,29 +47,175 @@ u32  gsKit_texture_size_ee(int width, int height, int psm)
 
 u32  gsKit_texture_size(int width, int height, int psm)
 {
-	if(psm == GS_PSM_T8 || psm == GS_PSM_T4)
+	int widthBlocks, heightBlocks;
+	int widthAlign, heightAlign;
 
-		width = (-GS_VRAM_TBWALIGN_CLUT)&(width+GS_VRAM_TBWALIGN_CLUT-1);
-	else
-		width = (-GS_VRAM_TBWALIGN)&(width+GS_VRAM_TBWALIGN-1);
-
-	height = (-GS_VRAM_TBWALIGN)&(height+GS_VRAM_TBWALIGN-1);
-
-#ifdef DEBUG
-	printf("Width: %d - Height: %d\n", width, height);
-#endif
-
+	// Calculate the number of blocks width and height
+	// A block is 256 bytes in size
 	switch (psm) {
-		case GS_PSM_CT32:  return (width*height*4);
-		case GS_PSM_CT24:  return (width*height*4);
-		case GS_PSM_CT16:  return (width*height*2);
-		case GS_PSM_CT16S: return (width*height*2);
-		case GS_PSM_T8:    return (width*height  );
-		case GS_PSM_T4:    return (width*height/2);
-		default: printf("gsKit: unsupported PSM %d\n", psm);
+		case GS_PSM_CT32:
+		case GS_PSM_CT24:
+			// 1 block = 8x8 pixels
+			widthBlocks  = (width  + 7) / 8;
+			heightBlocks = (height + 7) / 8;
+			break;
+		case GS_PSM_CT16:
+		case GS_PSM_CT16S:
+			// 1 block = 16x8 pixels
+			widthBlocks  = (width  + 15) / 16;
+			heightBlocks = (height +  7) /  8;
+			break;
+		case GS_PSM_T8:
+			// 1 block = 16x16 pixels
+			widthBlocks  = (width  + 15) / 16;
+			heightBlocks = (height + 15) / 16;
+			break;
+		case GS_PSM_T4:
+			// 1 block = 32x16 pixels
+			widthBlocks  = (width  + 31) / 32;
+			heightBlocks = (height + 15) / 16;
+			break;
+		default:
+			printf("gsKit: unsupported PSM %d\n", psm);
+			return -1;
 	}
 
-	return -1;
+	// Calculate the minimum block alignment
+	if(psm == GS_PSM_CT32 || psm == GS_PSM_CT24 || psm == GS_PSM_T8) {
+		// 8x4 blocks in a page.
+		// block traversing order:
+		// 0145....
+		// 2367....
+		// ........
+		// ........
+		if(widthBlocks <= 2 && heightBlocks <= 1) {
+			widthAlign = 1;
+			heightAlign = 1;
+		}
+		else if(widthBlocks <= 4 && heightBlocks <= 2) {
+			widthAlign = 2;
+			heightAlign = 2;
+		}
+		else if(widthBlocks <= 8 && heightBlocks <= 4) {
+			widthAlign = 4;
+			heightAlign = 4;
+		}
+		else {
+			widthAlign = 8;
+			heightAlign = 4;
+		}
+	}
+	else if(psm == GS_PSM_CT16 || psm == GS_PSM_T4) {
+		// 4x8 blocks in a page.
+		// block traversing order:
+		// 02..
+		// 13..
+		// 46..
+		// 57..
+		// ....
+		// ....
+		// ....
+		// ....
+		if(widthBlocks <= 1 && heightBlocks <= 2) {
+			widthAlign = 1;
+			heightAlign = 1;
+		}
+		else if(widthBlocks <= 2 && heightBlocks <= 4) {
+			widthAlign = 2;
+			heightAlign = 2;
+		}
+		else if(widthBlocks <= 4 && heightBlocks <= 8) {
+			widthAlign = 4;
+			heightAlign = 4;
+		}
+		else {
+			widthAlign = 4;
+			heightAlign = 8;
+		}
+	}
+	else /* if(psm == GS_PSM_CT16S) */ {
+		// 4x8 blocks in a page.
+		// block traversing order:
+		// 02..
+		// 13..
+		// ....
+		// ....
+		// 46..
+		// 57..
+		// ....
+		// ....
+		if(widthBlocks <= 1 && heightBlocks <= 2) {
+			widthAlign = 1;
+			heightAlign = 1;
+		}
+		else if(widthBlocks <= 2 && heightBlocks <= 2) {
+			widthAlign = 2;
+			heightAlign = 2;
+		}
+		else if(widthBlocks <= 2 && heightBlocks <= 8) {
+			widthAlign = 2;
+			heightAlign = 8;
+		}
+		else {
+			widthAlign = 4;
+			heightAlign = 8;
+		}
+	}
+
+	widthBlocks  = (-widthAlign)  & (widthBlocks  + widthAlign  - 1);
+	heightBlocks = (-heightAlign) & (heightBlocks + heightAlign - 1);
+
+	return widthBlocks * heightBlocks * 256;
+}
+
+static inline u8
+from8to5(u8 c, const s8 dither)
+{
+	if((c+dither) > 255)
+		return 255>>3;
+	else if((c+dither) < 0)
+		return 0;
+	else
+		return (c+dither)>>3;
+}
+
+static inline u16
+fromRGBto16(const s8 dither, u8 r, u8 g, u8 b)
+{
+	// A1 B5 G5 R5
+	return 0x8000 | (from8to5(b, dither)<<10) | (from8to5(g, dither)<<5) | from8to5(r, dither);
+}
+
+static inline u16
+from24to16(const s8 dither, u8 *c)
+{
+	return fromRGBto16(dither, c[0], c[1], c[2]);
+}
+
+void gsKit_texture_to_psm16(GSTEXTURE *Texture)
+{
+	int x, y;
+	const s8 dither_matrix[16] = {-4,2,-3,3,0,-2,1,-1,-3,3,-4,2,1,-1,0,-2};
+
+	// Only 24bit to 16bit supported
+	if (Texture->PSM != GS_PSM_CT24)
+		return;
+
+	size_t size = Texture->Width * Texture->Height * 2;
+	u16 *pixels16 = (u16*)memalign(128, size);
+	u8  *pixels24 = (u8 *)Texture->Mem;
+
+	for(y=0; y < Texture->Height; y++) {
+		for(x=0; x < Texture->Width; x++) {
+			int i = y * Texture->Width + x;
+			s8 dither = dither_matrix[(y&3)*4+(x&3)];
+			pixels16[i] = from24to16(dither, &pixels24[i*3]);
+		}
+	}
+
+	free(Texture->Mem);
+	Texture->Mem = (void*)pixels16;
+	Texture->PSM = GS_PSM_CT16S;
 }
 
 void gsKit_texture_send(u32 *mem, int width, int height, u32 tbp, u32 psm, u32 tbw, u8 clut)

@@ -36,6 +36,12 @@ u32 gsKit_vram_alloc(GSGLOBAL *gsGlobal, u32 size, u8 type)
 	else
 	{
 		gsGlobal->CurrentPointer += size;
+
+		// Re-initialize the texture manager
+		// NOTE: this is here for compatibility, it's better not to use
+		//       gsKit_vram_alloc, and use gsKit_TexManager_bind instead.
+		gsKit_TexManager_init(gsGlobal);
+
 		#ifdef GSKIT_DEBUG
 		printf("CurrentPointer After:\t0x%08X\n", gsGlobal->CurrentPointer);
 		#endif
@@ -46,6 +52,11 @@ u32 gsKit_vram_alloc(GSGLOBAL *gsGlobal, u32 size, u8 type)
 void gsKit_vram_clear(GSGLOBAL *gsGlobal)
 {
     gsGlobal->CurrentPointer = gsGlobal->TexturePointer;
+
+	// Re-initialize the texture manager
+	// NOTE: this is here for compatibility, it's better not to use
+	//       gsKit_vram_alloc, and use gsKit_TexManager_bind instead.
+	gsKit_TexManager_init(gsGlobal);
 }
 
 void gsKit_sync_flip(GSGLOBAL *gsGlobal)
@@ -60,7 +71,6 @@ void gsKit_sync_flip(GSGLOBAL *gsGlobal)
 				gsGlobal->Width / 64, gsGlobal->PSM, 0, 0 );
 
 			gsGlobal->ActiveBuffer ^= 1;
-			gsGlobal->PrimContext ^= 1;
 		}
 
 	}
@@ -157,29 +167,15 @@ void gsKit_hsync_wait(void)
     while(!(*GS_CSR & 4));
 }
 
-/*
-enum
-{
-   kINTC_GS,
-   kINTC_SBUS,
-   kINTC_VBLANK_START,
-   kINTC_VBLANK_END,
-   kINTC_VIF0,
-   kINTC_VIF1,
-   kINTC_VU0,
-   kINTC_VU1,
-   kINTC_IPU,
-   kINTC_TIMER0,
-   kINTC_TIMER1
-};
-*/
 int gsKit_add_vsync_handler(int (*vsync_callback)())
 {
 	int callback_id;
 
 	DIntr();
-	callback_id = AddIntcHandler(2, vsync_callback, 0);
-	EnableIntc(kINTC_VBLANK_START);
+	callback_id = AddIntcHandler(INTC_VBLANK_S, vsync_callback, 0);
+	EnableIntc(INTC_VBLANK_S);
+	// Unmask VSync interrupt
+	GsPutIMR(GsGetIMR() & ~0x0800);
 	EIntr();
 
 	return callback_id;
@@ -188,8 +184,34 @@ int gsKit_add_vsync_handler(int (*vsync_callback)())
 void gsKit_remove_vsync_handler(int callback_id)
 {
 	DIntr();
-	DisableIntc(kINTC_VBLANK_START);
-	RemoveIntcHandler(2, callback_id);
+	// Mask VSync interrupt
+	GsPutIMR(GsGetIMR() | 0x0800);
+	DisableIntc(INTC_VBLANK_S);
+	RemoveIntcHandler(INTC_VBLANK_S, callback_id);
+	EIntr();
+}
+
+int gsKit_add_hsync_handler(int (*hsync_callback)())
+{
+	int callback_id;
+
+	DIntr();
+	callback_id = AddIntcHandler(INTC_GS, hsync_callback, 0);
+	EnableIntc(INTC_GS);
+	// Unmask HSync interrupt
+	GsPutIMR(GsGetIMR() & ~0x0400);
+	EIntr();
+
+	return callback_id;
+}
+
+void gsKit_remove_hsync_handler(int callback_id)
+{
+	DIntr();
+	// Mask HSync interrupt
+	GsPutIMR(GsGetIMR() | 0x0400);
+	DisableIntc(INTC_GS);
+	RemoveIntcHandler(INTC_GS, callback_id);
 	EIntr();
 }
 
@@ -472,9 +494,9 @@ void gsKit_queue_reset(GSQUEUE *Queue)
 		if(Queue->mode == GS_ONESHOT)
 		{
 			Queue->dbuf  ^= 1;
-			Queue->dma_tag = Queue->pool[Queue->dbuf];
 		}
 
+		Queue->dma_tag = Queue->pool[Queue->dbuf];
 		Queue->pool_cur = Queue->dma_tag + 16;
 		Queue->last_type = GIF_RESERVED;
 		Queue->last_tag = Queue->pool_cur;
@@ -502,14 +524,61 @@ void gsKit_queue_exec(GSGLOBAL *gsGlobal)
 	gsGlobal->FirstFrame = GS_SETTING_OFF;
 }
 
+void gsKit_queue_init(GSGLOBAL *gsGlobal, GSQUEUE *Queue, u8 mode, int size)
+{
+	// Init pool 0
+	Queue->pool[0]		= (u64 *)((u32)memalign(64, size) | 0x30000000);
+	Queue->pool_max[0]	= (u64 *)((u32)Queue->pool[0] + size);
+
+	if (mode == GS_ONESHOT)
+	{
+		// Init pool 1
+		Queue->pool[1]		= (u64 *)((u32)memalign(64, size) | 0x30000000);
+		Queue->pool_max[1]	= (u64 *)((u32)Queue->pool[1] + size);
+	}
+
+	Queue->dma_tag		= Queue->pool[0];
+	Queue->pool_cur		= (u64 *)((u32)Queue->pool[0] + 16);
+	Queue->dbuf			= 0;
+	Queue->tag_size		= 0;
+	Queue->last_tag		= Queue->pool_cur;
+	Queue->last_type	= GIF_RESERVED;
+	Queue->mode			= mode;
+}
+
+void gsKit_queue_free(GSGLOBAL *gsGlobal, GSQUEUE *Queue)
+{
+	if (Queue == NULL)
+		return;
+
+	if (Queue->pool[0] != NULL)
+	{
+		Queue->pool[0] = (u64 *)((u32)Queue->pool[0] ^ 0x30000000);
+		free(Queue->pool[0]);
+		Queue->pool[0] = NULL;
+	}
+
+	if (Queue->pool[1] != NULL)
+	{
+		Queue->pool[1] = (u64 *)((u32)Queue->pool[1] ^ 0x30000000);
+		free(Queue->pool[1]);
+		Queue->pool[1] = NULL;
+	}
+}
+
+void gsKit_queue_set(GSGLOBAL *gsGlobal, GSQUEUE *Queue)
+{
+	gsGlobal->CurQueue = Queue;
+}
+
 void gsKit_mode_switch(GSGLOBAL *gsGlobal, u8 mode)
 {
 	if(mode == GS_PERSISTENT)
 	{
-		gsGlobal->CurQueue = gsGlobal->Per_Queue;
+		gsKit_queue_set(gsGlobal, gsGlobal->Per_Queue);
 	}
 	else
 	{
-		gsGlobal->CurQueue = gsGlobal->Os_Queue;
+		gsKit_queue_set(gsGlobal, gsGlobal->Os_Queue);
 	}
 }
