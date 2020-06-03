@@ -14,6 +14,8 @@
 #include "gsKit.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <malloc.h>
 #include <kernel.h>
 #include <osd_config.h>
 
@@ -161,6 +163,13 @@ void gsKit_set_buffer_attributes(GSGLOBAL *gsGlobal)
 			gsGlobal->DW = 1920;
 			gsGlobal->DH = 1080;
 			break;
+	}
+
+	if((gsGlobal->Mode == GS_MODE_NTSC || gsGlobal->Mode == GS_MODE_PAL) && (gsGlobal->Interlace == GS_NONINTERLACED)) {
+		// NTSC 240p instead of 480i
+		// PAL  288p instead of 576i
+		gsGlobal->StartY /= 2;
+		gsGlobal->DH /= 2;
 	}
 
 	gsGlobal->MagH = (gsGlobal->DW / gsGlobal->Width) - 1; // gsGlobal->DW should be a multiple of the screen width
@@ -465,9 +474,7 @@ GSGLOBAL *gsKit_init_global_custom(int Os_AllocSize, int Per_AllocSize)
 	gsGlobal->Clamp = calloc(1,sizeof(GSCLAMP));
 	gsGlobal->Os_Queue = calloc(1,sizeof(GSQUEUE));
 	gsGlobal->Per_Queue = calloc(1,sizeof(GSQUEUE));
-	gsGlobal->dma_misc = (u64 *)((u32)memalign(64, 512) | 0x30000000);
-
-	FlushCache(0);
+	gsGlobal->dma_misc = gsKit_alloc_ucab(512);
 
 	/* Generic Values */
 	if(configGetTvScreenType() == 2) gsGlobal->Aspect = GS_ASPECT_16_9;
@@ -549,9 +556,7 @@ void gsKit_deinit_global(GSGLOBAL *gsGlobal)
 	gsKit_queue_free(gsGlobal, gsGlobal->Per_Queue);
 	gsKit_queue_free(gsGlobal, gsGlobal->Os_Queue);
 
-    gsGlobal->dma_misc = (u64 *)((u32)gsGlobal->dma_misc ^ 0x30000000);
-
-    free(gsGlobal->dma_misc);
+    gsKit_free_ucab(gsGlobal->dma_misc);
     free(gsGlobal->Per_Queue);
     free(gsGlobal->Os_Queue);
     free(gsGlobal->Clamp);

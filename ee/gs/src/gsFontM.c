@@ -17,7 +17,11 @@
 //
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <string.h>
+#include <malloc.h>
 
 #include "gsKit.h"
 #include "gsInline.h"
@@ -45,20 +49,61 @@ static u32 gsKit_fontm_ascii[128] = {	   0,   0,   0,   0,   0,   0,   0,   0,  
 /// FONTM CLUT
 /// FONTM Textures are GS_PSM_T4, and need a 16x16 CLUT
 /// This is a greyscale ramp CLUT, with linear alpha.
-static u32 gsKit_fontm_clut[16] = {	0x00000000, 0x11111111, 0x22222222, 0x33333333, \
-					0x44444444, 0x55555555, 0x66666666, 0x77777777, \
-					0x80888888, 0x80999999, 0x80AAAAAA, 0x80BBBBBB, \
-					0x80CCCCCC, 0x80DDDDDD, 0x80EEEEEE, 0x80FFFFFF };
+static u32 gsKit_fontm_clut[16] __attribute__((aligned(128))) = {
+	0x00000000,
+	0x11111111,
+	0x22222222,
+	0x33333333,
+	0x44444444,
+	0x55555555,
+	0x66666666,
+	0x77777777,
+	0x80888888,
+	0x80999999,
+	0x80AAAAAA,
+	0x80BBBBBB,
+	0x80CCCCCC,
+	0x80DDDDDD,
+	0x80EEEEEE,
+	0x80FFFFFF
+};
 
 
 GSFONTM *gsKit_init_fontm(void)
 {
+	int pgindx;
+	GSFONTM *gsFontM;
 
-	GSFONTM *gsFontM = calloc(1,sizeof(GSFONTM));
-	gsFontM->Texture = calloc(1,sizeof(GSTEXTURE));
-
+	gsFontM = calloc(1, sizeof(GSFONTM));
+	for (pgindx=0; pgindx<GS_FONTM_PAGE_COUNT; pgindx++)
+		gsFontM->Texture[pgindx] = calloc(1, sizeof(GSTEXTURE));
 
 	return gsFontM;
+}
+
+void gsKit_free_fontm(GSGLOBAL *gsGlobal, GSFONTM *gsFontM)
+{
+	int pgindx;
+
+	for (pgindx=0; pgindx<GS_FONTM_PAGE_COUNT; pgindx++) {
+		// Free from vram
+		gsKit_TexManager_free(gsGlobal, gsFontM->Texture[pgindx]);
+		// clut was pointing to static memory, so do not free
+		gsFontM->Texture[pgindx]->Clut = NULL;
+		// mem was pointing to 'TexBase', so do not free
+		gsFontM->Texture[pgindx]->Mem = NULL;
+		// free texture
+		free(gsFontM->Texture[pgindx]);
+		gsFontM->Texture[pgindx] = NULL;
+	}
+
+	if (gsFontM->Header.offset_table != NULL)
+		free(gsFontM->Header.offset_table);
+
+	if (gsFontM->TexBase != NULL)
+		free(gsFontM->TexBase);
+
+	free(gsFontM);
 }
 
 int gsKit_fontm_upload(GSGLOBAL *gsGlobal, GSFONTM *gsFontM)
@@ -68,29 +113,19 @@ int gsKit_fontm_upload(GSGLOBAL *gsGlobal, GSFONTM *gsFontM)
     if(gsKit_fontm_unpack(gsFontM) == -1)
 		return -1;
 
-	gsFontM->Texture->Width = 52;
-    gsFontM->Texture->Height = 832;
-    gsFontM->Texture->PSM = GS_PSM_T4;
-    gsFontM->Texture->ClutPSM = GS_PSM_CT32;
-    gsFontM->Texture->Filter = GS_FILTER_LINEAR;
-    gsKit_setup_tbw(gsFontM->Texture);
+	for (pgindx=0; pgindx<GS_FONTM_PAGE_COUNT; pgindx++) {
+		gsFontM->Texture[pgindx]->Width = 52;
+	    gsFontM->Texture[pgindx]->Height = 832;
+	    gsFontM->Texture[pgindx]->PSM = GS_PSM_T4;
+	    gsFontM->Texture[pgindx]->ClutPSM = GS_PSM_CT32;
+	    gsFontM->Texture[pgindx]->Filter = GS_FILTER_LINEAR;
+		gsFontM->Texture[pgindx]->Clut = gsKit_fontm_clut;
+	    gsKit_setup_tbw(gsFontM->Texture[pgindx]);
+	}
 
-	gsFontM->Texture->VramClut = gsKit_vram_alloc(gsGlobal, 4096, GSKIT_ALLOC_USERBUFFER);
-	int TexSize = gsKit_texture_size(gsFontM->Texture->Width, gsFontM->Texture->Height, gsFontM->Texture->PSM);
-    for(pgindx = 0; pgindx < GS_FONTM_PAGE_COUNT; ++pgindx)
-    {
-        gsFontM->Vram[pgindx] = gsKit_vram_alloc(gsGlobal, TexSize, GSKIT_ALLOC_USERBUFFER);
-        gsFontM->LastPage[pgindx] = (u32) -1;
-    }
-	gsFontM->Texture->Vram = gsFontM->Vram[0];
 	gsFontM->VramIdx = 0;
 	gsFontM->Spacing = 1.0f;
 	gsFontM->Align = GSKIT_FALIGN_LEFT;
-
-	gsFontM->Texture->Clut = memalign(128, 64);
-	memcpy(gsFontM->Texture->Clut, gsKit_fontm_clut, 64);
-	gsKit_texture_send(gsFontM->Texture->Clut, 8,  2, gsFontM->Texture->VramClut, gsFontM->Texture->ClutPSM, 1, GS_CLUT_PALLETE);
-	free(gsFontM->Texture->Clut);
 
 	return 0;
 }
@@ -100,27 +135,27 @@ int gsKit_fontm_unpack(GSFONTM *gsFontM)
 	void *packed;
 	void *unpacked;
 
-	int FontMFile = fioOpen("rom0:FONTM", O_RDONLY);
+	int FontMFile = open("rom0:FONTM", O_RDONLY);
 	if(FontMFile < 0)
 	{
 		printf("Failed to open FONTM from ROM0\n");
 		return -1;
 	}
 
-	int PackedSize = fioLseek(FontMFile, 0, SEEK_END);
+	int PackedSize = lseek(FontMFile, 0, SEEK_END);
 
-	fioLseek(FontMFile, 0, SEEK_SET);
+	lseek(FontMFile, 0, SEEK_SET);
 
 	packed = malloc(PackedSize);
 
-	if(fioRead(FontMFile, packed, PackedSize) != PackedSize)
+	if(read(FontMFile, packed, PackedSize) != PackedSize)
 	{
 		printf("Error Reading Packed FONTM Data\n");
-		fioClose(FontMFile);
+		close(FontMFile);
 		return -1;
 	}
 
-	fioClose(FontMFile);
+	close(FontMFile);
 
 	struct gsKit_fontm_unpack updata;
 
@@ -135,11 +170,11 @@ int gsKit_fontm_unpack(GSFONTM *gsFontM)
 
 /*
 	// Use this to dump the unpacked fontm file to host:
-	int DumpFile = fioOpen("host:fontm.dump", O_RDWR);
+	int DumpFile = open("host:fontm.dump", O_RDWR);
 
-	fioWrite(DumpFile, unpacked, updata.size);
+	write(DumpFile, unpacked, updata.size);
 
-	fioClose(DumpFile);
+	close(DumpFile);
 */
 
 	gsFontM->Header.sig = *(u32 *)unpacked;
@@ -368,7 +403,6 @@ void gsKit_fontm_print_scaled(GSGLOBAL *gsGlobal, GSFONTM *gsFontM, float X, flo
 			int idx;
 			int pgindx;
 			uoffset = 0;
-			gsFontM->pgcount = 0;
 
 			if(cur == '\f')
 			{
@@ -485,27 +519,34 @@ void gsKit_fontm_print_scaled(GSGLOBAL *gsGlobal, GSFONTM *gsFontM, float X, flo
 
 			*p_data++ = GS_CLAMP_1+gsGlobal->PrimContext;
 
-            for(pgindx = 0; pgindx < GS_FONTM_PAGE_COUNT; ++pgindx)
-            {
-                if (gsFontM->LastPage[pgindx] == aligned)
-                {
-                    gsFontM->Texture->Vram = gsFontM->Vram[pgindx];
-                    gsFontM->VramIdx = (pgindx + 1) % GS_FONTM_PAGE_COUNT;
-                    break;
-                }
-            }
-            if(pgindx >= GS_FONTM_PAGE_COUNT)
-            {
-                //printf("FontM Upload %d %d\n", gsFontM->VramIdx, aligned);
-                ++gsFontM->pgcount;
-                gsFontM->Texture->Vram = gsFontM->Vram[gsFontM->VramIdx];
-                gsKit_texture_send_inline(gsGlobal, (void *)aligned, gsFontM->Texture->Width, gsFontM->Texture->Height, gsFontM->Texture->Vram, GS_PSM_T4, gsFontM->Texture->TBW, GS_CLUT_NONE);
-                //gsKit_texture_send_inline(gsGlobal, (void *)aligned, gsFontM->Texture->Width, gsFontM->Texture->Height, gsFontM->Texture->Vram, GS_PSM_T4, gsFontM->Texture->TBW, GS_CLUT_NONE);
-                gsFontM->LastPage[gsFontM->VramIdx] = aligned;
-                gsFontM->VramIdx = (gsFontM->VramIdx + 1) % GS_FONTM_PAGE_COUNT;
-            }
+			for (pgindx=0; pgindx<GS_FONTM_PAGE_COUNT; pgindx++) {
+				if (gsFontM->Texture[pgindx]->Mem == (void *)aligned) {
+					// Page found
+					break;
+				}
+			}
+			if (pgindx >= GS_FONTM_PAGE_COUNT) {
+				// Page not found
+				// Try to find unused page first
+				for (pgindx=0; pgindx<GS_FONTM_PAGE_COUNT; pgindx++) {
+					if (gsFontM->Texture[pgindx]->Mem == 0) {
+						// Unused page found
+						break;
+					}
+				}
+				// Invalidate a page if no free page found
+				if (pgindx >= GS_FONTM_PAGE_COUNT) {
+					pgindx = (gsFontM->VramIdx + 1) % GS_FONTM_PAGE_COUNT;
+					gsKit_TexManager_invalidate(gsGlobal, gsFontM->Texture[pgindx]);
+				}
 
-            gsKit_prim_sprite_texture(gsGlobal, gsFontM->Texture, posx[curline], posy, uoffset, voffset,
+				gsFontM->Texture[pgindx]->Mem = (void *)aligned;
+				//printf("Mem[%d] = 0x%x\n", pgindx, aligned);
+			}
+
+			gsFontM->VramIdx = pgindx; // Last used page index
+			gsKit_TexManager_bind(gsGlobal, gsFontM->Texture[pgindx]);
+            gsKit_prim_sprite_texture(gsGlobal, gsFontM->Texture[pgindx], posx[curline], posy, uoffset, voffset,
                 (float)posx[curline] + (26.0f * scale), (float)posy + (26.0f * scale), uoffset + 26, voffset + 27, Z, color);
 
             posx[curline] += (26.0f * gsFontM->Spacing * scale);

@@ -200,6 +200,12 @@ void gsKit_set_primalpha(GSGLOBAL *gsGlobal, u64 AlphaMode, u8 PerPixel);
 /// Sets the Texture Filtering Parameters
 void gsKit_set_texfilter(GSGLOBAL *gsGlobal, u8 FilterMode);
 
+/// Sets the Dither Matrix Setting
+void gsKit_set_dither_matrix(GSGLOBAL *gsGlobal);
+
+/// Enables/Disables dithering, with the gsGlobal Dithering option.
+void gsKit_set_dither(GSGLOBAL *gsGlobal);
+
 /// Append the Current Queue with a GS_FINISH Register
 GSQUEUE gsKit_set_finish(GSGLOBAL *gsGlobal);
 
@@ -211,6 +217,12 @@ void gsKit_queue_exec(GSGLOBAL *gsGlobal);
 
 /// Specific Draw Queue "Execution" (Kicks the Queue passed for the second argument)
 void gsKit_queue_exec_real(GSGLOBAL *gsGlobal, GSQUEUE *Queue);
+
+/// Allocate UCAB buffer in GSQUEUE, internal use only
+void *gsKit_alloc_ucab(int size);
+
+/// Free UCAB buffer in GSQUEUE, internal use only
+void gsKit_free_ucab(void *p);
 
 /// Initialize a Draw Queue (Allocates memory for the Queue)
 void gsKit_queue_init(GSGLOBAL *gsGlobal, GSQUEUE *Queue, u8 mode, int size);

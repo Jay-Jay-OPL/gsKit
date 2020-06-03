@@ -33,8 +33,8 @@ int main(int argc, char *argv[])
 	// Initialize the DMAC
 	dmaKit_chan_init(DMA_CHANNEL_GIF);
 
-	Black = GS_SETREG_RGBAQ(0x00,0x00,0x00,0x00,0x00);
-	White = GS_SETREG_RGBAQ(0xFF,0xFF,0xFF,0x00,0x00);
+	Black = GS_SETREG_RGBAQ(0x00,0x00,0x00,0x80,0x00);
+	White = GS_SETREG_RGBAQ(0xFF,0xFF,0xFF,0x80,0x00);
 
 	WhiteFont = GS_SETREG_RGBAQ(0x80,0x80,0x80,0x80,0x00);
 	BlackFont = GS_SETREG_RGBAQ(0x00,0x00,0x00,0x80,0x00);
@@ -68,10 +68,12 @@ int main(int argc, char *argv[])
 
 	gsFontM->Spacing = 0.95f;
 
+	test.Delayed = 1;
 	gsKit_texture_bmp(gsGlobal, &test, "host:test.bmp");
 	test.Filter = GS_FILTER_LINEAR;
 
-    gsKit_mode_switch(gsGlobal, GS_ONESHOT);
+	gsKit_mode_switch(gsGlobal, GS_ONESHOT);
+	gsKit_set_primalpha(gsGlobal, GS_SETREG_ALPHA(0, 1, 0, 1, 0), 0);
 
 	while(1)
 	{
@@ -95,7 +97,8 @@ int main(int argc, char *argv[])
 
 		gsKit_clear(gsGlobal, White);
 
-	    gsKit_prim_sprite_texture(gsGlobal, &test,
+		gsKit_TexManager_bind(gsGlobal, &test);
+		gsKit_prim_sprite_texture(gsGlobal, &test,
                                         50.0f, 50.0f, 0.0f, 0.0f,
                                         gsGlobal->Width - 50.0f, gsGlobal->Height - 50.0f,
                                         test.Width, test.Height,
@@ -137,6 +140,7 @@ int main(int argc, char *argv[])
 
 		gsKit_queue_exec(gsGlobal);
 		gsKit_sync_flip(gsGlobal);
+		gsKit_TexManager_nextFrame(gsGlobal);
 	}
 
 	return 0;

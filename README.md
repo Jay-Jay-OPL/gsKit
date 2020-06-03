@@ -1,3 +1,5 @@
+# GSKIT
+```
   ____     ___ |    / _____ _____
  |  __    |    |___/    |     |
  |___| ___|    |    \ __|__   |              gsKit Open Source Project.
@@ -6,10 +8,13 @@
  All rights reserved.
  Licenced under Academic Free License version 2.0
  -----------------------------------------------------------------------
+```
 
- Introduction
- -----------------------------------------------------------------------
+[![CI](https://github.com/ps2dev/gsKit/workflows/CI/badge.svg)](https://github.com/ps2dev/gsKit/actions?query=workflow%3ACI)
+[![CI-Docker](https://github.com/ps2dev/gsKit/workflows/CI-Docker/badge.svg)](https://github.com/ps2dev/gsKit/actions?query=workflow%3ACI-Docker)
 
+ ## Introduction
+ 
  gsKit is a library that provides a C interface to the Playstation 2
  Graphics Synthesizer. It is low level in nature, implimented using the
  PS2SDK and inline assembly. This project does not aim to be all
@@ -35,34 +40,48 @@
 
  gsKit also includes a library named dmaKit. dmaKit provides C 
  routines for DMAC usage by gsKit. The aim of this library is also
- for eventual inclusion in PS2SDK. For now, it will remain part of the
+ for eventual inclusion in [PS2SDK](https://github.com/ps2dev/ps2sdk). For now, it will remain part of the
  gsKit project while it matures.
 
- This library is designed for intergration into the PS2SDK when it 
+ This library is designed for integration into the PS2SDK when it 
  becomes mature. As such, it is also designed to link and compile
  against the PS2SDK. Support for PS2LIB and other support libraries is
  untested.
 
- Project Layout
- -----------------------------------------------------------------------
+ ## Project Layout
 
  A source or binary release of gsKit will include the following
  directories:
 
- gsKit/lib		- gsKit compiled libraries.
- gsKit/doc		- gsKit documentation.
- gsKit/examples		- Example projects demonstrating use of gsKit.
- gsKit/ee		- ee root directory.
- gsKit/ee/gs		- gsKit source root.
- gsKit/ee/gs/include	- gsKit include files.
- gsKit/ee/gs/src	- gsKit source files.
- gsKit/ee/dma		- dmaKit source root.
- gsKit/ee/dma/include	- dmaKit include files.
- gsKit/ee/dms/src	- dmaKit source files.
- gsKit/vu1		- VU1 assembly files.
+- `gsKit/lib` - gsKit compiled libraries.
+- `gsKit/doc` - gsKit documentation.
+- `gsKit/examples` - Example projects demonstrating use of gsKit.
+- `gsKit/ee` - ee root directory.
+- `gsKit/ee/gs` - gsKit source root.
+- `gsKit/ee/gs/include` - gsKit include files.
+- `gsKit/ee/gs/src` - gsKit source files.
+- `gsKit/ee/dma` - dmaKit source root.
+- `gsKit/ee/dma/include` - dmaKit include files.
+- `gsKit/ee/dms/src` - dmaKit source files.
+- `gsKit/vu1` - VU1 assembly files.
 
- Important Notes
- -----------------------------------------------------------------------
+## Installation
+
+1. Install PS2Toolchain
+In order to install `gsKit`, you must have previously installed the [PS2Toolchain](https://github.com/ps2dev/ps2toolchain) 
+(which automatically install also the [PS2SDK](https://github.com/ps2dev/ps2sdk))
+
+2. Edit your login script
+Add this to your login script (example: `~/.bash_profile`)  
+`export GSKIT=$PS2DEV/gsKit`
+
+NOTE: You should have already defined in your login script the `$PS2DEV` variable
+
+3. Compile and Install
+Run the next command
+`make && make install`
+
+ ## Important Notes
 
  There are several small notes that need to be made about gsKit operation.
 
@@ -86,13 +105,11 @@
  - You can specify some external libraries in Makefile.pref
    (just uncomment what you need)
 
- Feedback & Questions
- -----------------------------------------------------------------------
+ ## Feedback & Questions
 
  You can usually find the developers on freenode in the channel #ps2dev. You
  can also use the forums at http://forums.ps2dev.org, 
 
- Credits
- -----------------------------------------------------------------------
- 
+ ## Credits
+
  See AUTHORS.

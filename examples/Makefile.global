@@ -24,7 +24,7 @@ ifdef LIBTIFF
         EE_INCS += -I$(LIBTIFF)/include
         EE_CFLAGS += -DHAVE_LIBTIFF
         EE_LIB_DIRS += -L$(LIBTIFF)/lib
-        EE_LIBS += -ltiff -lm
+        EE_LIBS += -ltiff
 endif
 
 ifdef LIBPNG
@@ -32,22 +32,36 @@ ifdef ZLIB
 	EE_INCS += -I$(ZLIB)/include -I$(LIBPNG)/include
 	EE_CFLAGS += -DHAVE_LIBPNG -DHAVE_ZLIB
 	EE_LIB_DIRS += -L$(ZLIB)/lib -L$(LIBPNG)/lib
-	EE_LIBS += -lz -lpng -lm
+	EE_LIBS += -lz -lpng
 endif
 endif
 
 EE_LIBS += -lgskit_toolkit
 EE_LIBS += -lgskit -ldmakit
-EE_LIBS += -lc -lkernel
 
 EE_LIBS += -Xlinker --end-group
 
 # include dir
 EE_INCS += -I$(GSKITSRC)/ee/gs/include -I$(GSKITSRC)/ee/dma/include
-EE_CFLAGS += -fno-builtin-printf
 EE_INCS += -I$(GSKITSRC)/ee/toolkit/include
 
 # linker flags
 EE_LIB_DIRS += -L$(GSKITSRC)/lib
 EE_LIB_DIRS += -L$(PS2SDK)/ee/lib
 EE_LDFLAGS += $(EE_LIB_DIRS)
+
+all: $(EE_BIN)
+
+test: all
+	ps2client -h $(PS2_IP) -t 1 execee host:$(EE_BIN)
+
+sim: all
+	PCSX2 --elf=$(PWD)/$(EE_BIN) --nogui
+
+reset: clean
+	ps2client -h $(PS2_IP) reset
+
+clean:
+	rm -f $(EE_OBJS) $(EE_BIN)
+
+install: all
